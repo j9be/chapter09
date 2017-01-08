@@ -2,37 +2,29 @@ package packt.java9.by.example.mybusiness.inventory;
 
 import org.springframework.stereotype.Component;
 import packt.java9.by.example.mybusiness.product.Product;
-import packt.java9.by.example.mybusiness.product.ProductDoesNotExists;
 import packt.java9.by.example.mybusiness.product.ProductIsOutOfStock;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class Inventory {
-    private final Map<Product, InventoryItem> inventory = new HashMap<>();
+    private final Map<Product, InventoryItem> inventory =
+            new ConcurrentHashMap<>();
 
-    public InventoryItem getItem(Product product) {
+    private InventoryItem getItem(Product product) {
+        inventory.putIfAbsent(product, new InventoryItem());
         return inventory.get(product);
     }
 
     public void store(Product product, long amount) {
-        if (inventory.containsKey(product)) {
-            inventory.get(product).store(amount);
-        } else {
-            inventory.put(product, new InventoryItem(amount));
-        }
+        getItem(product).store(amount);
     }
 
-    public void remove(Product product, long amount) throws ProductDoesNotExists, ProductIsOutOfStock {
-        if (inventory.containsKey(product)) {
-            if (inventory.get(product).amount() >= amount) {
-                inventory.get(product).remove(amount);
-            } else {
-                throw new ProductIsOutOfStock(product);
-            }
-        } else {
-            throw new ProductDoesNotExists(product);
-        }
+    public void remove(Product product, long amount)
+            throws ProductIsOutOfStock {
+        if (getItem(product).remove(amount) != amount)
+            throw new ProductIsOutOfStock(product);
     }
 }

@@ -9,16 +9,17 @@ import packt.java9.by.example.mybusiness.product.Product;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Flow;
 import java.util.concurrent.SubmissionPublisher;
 
 public class TestInventoryKeeper {
-    Logger log = LoggerFactory.getLogger(TestInventoryKeeper.class);
+    private static final Logger log = LoggerFactory.getLogger(TestInventoryKeeper.class);
 
     @Test
     public void testInventoryRemoval() throws InterruptedException {
         Inventory inventory = new Inventory();
-        SubmissionPublisher<Order> p = new SubmissionPublisher<>();
+        SubmissionPublisher<Order> p = new SubmissionPublisher<>();//Executors.newFixedThreadPool(6), 20);
         p.subscribe(new InventoryKeeper(inventory));
         Product product = new Product();
         inventory.store(product, 20);
@@ -31,7 +32,7 @@ public class TestInventoryKeeper {
         order.setItems(items);
         for (int i = 0; i < 10; i++)
             p.submit(order);
-        log.info("Order was submitted");
+        log.info("All orders were submitted");
         for (int j = 0; j < 10; j++) {
             log.info("Sleeping a bit...");
             Thread.sleep(50);

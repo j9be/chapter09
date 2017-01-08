@@ -5,10 +5,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import packt.java9.by.example.mybusiness.product.Order;
 import packt.java9.by.example.mybusiness.product.OrderItem;
-import packt.java9.by.example.mybusiness.product.ProductDoesNotExists;
 import packt.java9.by.example.mybusiness.product.ProductIsOutOfStock;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class InventoryKeeper implements Flow.Subscriber<Order> {
     private static final Logger log = LoggerFactory.getLogger(InventoryKeeper.class);
@@ -19,26 +21,32 @@ public class InventoryKeeper implements Flow.Subscriber<Order> {
     }
 
     private Flow.Subscription subscription = null;
-    private static final long INFINITE = Long.MAX_VALUE;
+    private static final long WORKERS = 3;
 
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
         log.info("onSubscribe was called");
-        subscription.request(INFINITE);
+        subscription.request(3);
         this.subscription = subscription;
     }
 
+    private ExecutorService service = Executors.newFixedThreadPool((int) WORKERS);
+
     @Override
     public void onNext(Order order) {
-        log.info("onNext was called for {}", order);
-        for (OrderItem item : order.getItems()) {
-            try {
-                inventory.remove(item.getProduct(), item.getAmount());
-            } catch (ProductDoesNotExists | ProductIsOutOfStock exception) {
-                log.error("Product does not exists or not enough", exception);
-                subscription.cancel();
-            }
-        }
+        service.submit(() -> {
+                    log.info("Thread {}", Thread.currentThread().getName());
+                    for (OrderItem item : order.getItems()) {
+                        try {
+                            inventory.remove(item.getProduct(), item.getAmount());
+                            log.info("{} items removed from stock",item.getAmount());
+                        } catch (ProductIsOutOfStock exception) {
+                            log.error("Product out of stock");
+                        }
+                    }
+                    subscription.request(1);
+                }
+        );
     }
 
     @Override
